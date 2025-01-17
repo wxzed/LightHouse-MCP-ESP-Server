@@ -1,11 +1,13 @@
 
 # ESP32 MCP Server
 
-A Model Context Protocol (MCP) implementation for ESP32 microcontrollers, providing a WebSocket-based interface for resource discovery and monitoring.
+A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) implementation for ESP32 microcontrollers, providing a WebSocket-based interface for resource discovery and monitoring.
 
 ## Status: Not Compiling, initial commit as is from the model
 
 Created with Claude 3.5 Sonet on the commit date (with minor obvioud fixes with automatic formating, etc.)
+
+![architecture](docs/img/ESP32MCPServer.png)
 
 ## Features
 
