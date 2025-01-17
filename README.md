@@ -31,6 +31,52 @@ Created with Claude 3.5 Sonet on the commit date (with minor obvioud fixes with 
 - Python 3.7 or higher
 - Git
 
+## Architecture
+
+```mermaid
+flowchart TD
+    Start[Start Application] --> Setup[Setup]
+    Setup -->|Initialize Filesystem| InitFS[Initialize LittleFS]
+    Setup -->|Start Network| StartNetwork[Initialize Network Manager]
+    Setup -->|Create Tasks| CreateTasks[Create and Assign Tasks]
+
+    subgraph Network
+        StartNetwork --> APCheck[Check AP or Connect Mode]
+        APCheck -->|Credentials Exist| Connect[Connect to WiFi]
+        APCheck -->|No Credentials| StartAP[Start Access Point]
+        Connect --> NetworkReady[Network Ready]
+        StartAP --> NetworkReady
+    end
+
+    subgraph MCP_Server
+        MCP[Start MCP Server] --> HandleClient[Handle Client Connections]
+        HandleClient --> HandleRequest[Handle Requests]
+        HandleRequest -->|WebSocket Events| WebSocket[Handle WebSocket]
+        HandleRequest -->|HTTP Endpoints| HTTP[Process HTTP Requests]
+    end
+
+    subgraph Metrics
+        self[Start Metrics System] --> InitMetrics[Initialize System Metrics]
+        InitMetrics --> CollectMetrics[Collect Metrics Periodically]
+        CollectMetrics --> SaveMetrics[Save Metrics to Filesystem]
+    end
+
+    subgraph Logger
+        self[Start uLogger] --> LogMetrics[Log Metrics Data]
+        LogMetrics --> CompactLogs[Compact Logs if Necessary]
+        CompactLogs -->|Rotates Logs| LogRotation
+    end
+
+    CreateTasks -->|Network Task| NetworkTask[Run Network Task on Core]
+    CreateTasks -->|MCP Task| MCPTask[Run MCP Server Task on Core]
+    NetworkTask --> Network
+    MCPTask --> MCP_Server
+    MCP_Server --> Metrics
+    Metrics --> Logger
+
+
+```
+
 ## Installation
 
 1. Clone the repository:
