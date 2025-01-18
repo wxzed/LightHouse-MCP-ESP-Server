@@ -3,6 +3,7 @@
 #include "NetworkManager.h"
 #include "MCPServer.h"
 
+using namespace mcp;
 // Global instances
 NetworkManager networkManager;
 MCPServer mcpServer;

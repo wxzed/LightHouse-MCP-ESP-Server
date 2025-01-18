@@ -1,5 +1,7 @@
 #include "NetworkManager.h"
 #include <esp_random.h>
+#include <ArduinoJson.h>
+
 
 NetworkManager::NetworkManager() 
     : state(NetworkState::INIT),
@@ -20,7 +22,7 @@ void NetworkManager::begin() {
     }
 
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
-        if (event == SYSTEM_EVENT_STA_DISCONNECTED) {
+       if (static_cast<system_event_id_t>(event) == SYSTEM_EVENT_STA_DISCONNECTED) {
             if (state == NetworkState::CONNECTED) {
                 state = NetworkState::CONNECTION_FAILED;
                 queueRequest(NetworkRequest::Type::CHECK_CONNECTION);
@@ -252,10 +254,9 @@ void NetworkManager::clearCredentials() {
     credentials.password = "";
     credentials.valid = false;
 }
-
 String NetworkManager::getNetworkStatusJson(NetworkState state, const String& ssid, const String& ip) {
-    StaticJsonDocument<200> doc;
-    
+    JsonDocument doc; // Ensure you include <ArduinoJson.h>
+
     switch (state) {
         case NetworkState::CONNECTED:
             doc["status"] = "connected";
@@ -272,14 +273,15 @@ String NetworkManager::getNetworkStatusJson(NetworkState state, const String& ss
         default:
             doc["status"] = "initializing";
     }
-    
+
     doc["ssid"] = ssid;
     doc["ip"] = ip;
-    
+
     String response;
     serializeJson(doc, response);
     return response;
 }
+
 
 bool NetworkManager::isConnected() {
     return state == NetworkState::CONNECTED && WiFi.status() == WL_CONNECTED;
@@ -295,4 +297,10 @@ String NetworkManager::getSSID() {
     return state == NetworkState::AP_MODE ? 
            apSSID : 
            credentials.ssid;
+}
+
+void NetworkManager::queueRequest(NetworkRequest::Type type, const String &message) {
+    if (!requestQueue.push({type, message})) {
+        Serial.println("Request queue is full!");
+    }
 }

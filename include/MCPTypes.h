@@ -1,73 +1,49 @@
-#pragma once
+#ifndef MCP_TYPES_H
+#define MCP_TYPES_H
 
-#include <string>
-#include <variant>
 #include <ArduinoJson.h>
+#include <string>
 
 namespace mcp {
 
-// Request ID can be either an integer or string
-struct RequestId {
-    std::variant<int, std::string> value;
-    
-    RequestId(int id) : value(id) {}
-    RequestId(const std::string& id) : value(id) {}
-};
-
-// Request types supported by the MCP server
 enum class MCPRequestType {
     INITIALIZE,
-    RESOURCE_LIST,
+    RESOURCES_LIST,
     RESOURCE_READ,
     SUBSCRIBE,
     UNSUBSCRIBE
 };
 
-// MCP resource definition
-struct MCPResource {
-    std::string name;
-    std::string uri;
-    std::string mimeType;
-    std::string description;
-    
-    MCPResource(const std::string& n, const std::string& u, 
-                const std::string& m = "", const std::string& d = "")
-        : name(n), uri(u), mimeType(m), description(d) {}
-};
+using RequestId = uint32_t;
 
-// Server implementation information
-struct Implementation {
-    std::string name;
-    std::string version;
-    
-    Implementation(const std::string& n, const std::string& v)
-        : name(n), version(v) {}
-};
-
-// Server capabilities
-struct ServerCapabilities {
-    struct {
-        bool listChanged = true;
-        bool subscribe = true;
-    } resources;
-    
-    struct {
-        bool listChanged = false;
-    } tools;
-};
-
-// MCP request structure
 struct MCPRequest {
     MCPRequestType type;
     RequestId id;
     JsonObject params;
+
+    MCPRequest() : type(MCPRequestType::INITIALIZE), id(0), params() {}
 };
 
-// MCP response structure
 struct MCPResponse {
     bool success;
     std::string message;
     JsonVariant data;
+
+    MCPResponse() : success(false), message(""), data() {}
+    MCPResponse(bool s, const std::string &msg, JsonVariant d)
+        : success(s), message(msg), data(d) {}
+};
+
+struct MCPResource {
+    std::string name;
+    std::string uri;
+    std::string type;
+    std::string value;
+
+    MCPResource(const std::string &n, const std::string &u, const std::string &t, const std::string &v)
+        : name(n), uri(u), type(t), value(v) {}
 };
 
 } // namespace mcp
+
+#endif // MCP_TYPES_H

@@ -4,6 +4,8 @@
 #include <ArduinoJson.h>
 #include <esp_timer.h>
 
+using namespace mcp;
+
 // Constants
 static const char* BOOT_METRICS_FILE = "/boot_metrics.bin";
 static const char* CONFIG_FILE = "/metrics_config.json";
@@ -62,35 +64,18 @@ void MetricsSystem::end() {
     }
 }
 
-void MetricsSystem::initializeSystemMetrics() {
-    // Request metrics
-    registerCounter("system.requests.total", "Total handled requests");
-    registerCounter("system.requests.errors", "Request errors");
-    registerCounter("system.requests.timeouts", "Request timeouts");
-    registerHistogram("system.requests.duration", "Request handling duration (ms)");
-    
-    // System metrics
-    registerGauge("system.heap.free", "Free heap memory");
-    registerGauge("system.heap.min", "Minimum free heap memory");
-    registerGauge("system.wifi.signal", "WiFi signal strength (dBm)");
-    registerGauge("system.uptime", "System uptime (ms)");
-}
-
-void MetricsSystem::registerMetric(const String& name, MetricType type, const String& description) {
+void MetricsSystem::registerMetric(const String& name, MetricType type, const String& description,
+                                   const String& unit, const String& category) {
     std::lock_guard<std::mutex> lock(metricsMutex);
-    
+
     if (metrics.size() >= MAX_METRICS) {
         log_w("Max metrics limit reached, ignoring: %s", name.c_str());
         return;
     }
 
-    MetricInfo info;
-    info.name = name;
-    info.type = type;
-    info.description = description;
+    MetricInfo info = {name, type, description, unit, category};
     metrics[name] = info;
 
-    // Initialize boot metric
     MetricValue value = {millis(), {}};
     switch (type) {
         case MetricType::COUNTER:
@@ -106,70 +91,23 @@ void MetricsSystem::registerMetric(const String& name, MetricType type, const St
     bootMetrics[name] = value;
 }
 
-void MetricsSystem::registerCounter(const String& name, const String& description) {
-    registerMetric(name, MetricType::COUNTER, description);
+void MetricsSystem::registerCounter(const String& name, const String& description,
+                                    const String& unit, const String& category) {
+    registerMetric(name, MetricType::COUNTER, description, unit, category);
 }
 
-void MetricsSystem::registerGauge(const String& name, const String& description) {
-    registerMetric(name, MetricType::GAUGE, description);
+void MetricsSystem::registerGauge(const String& name, const String& description,
+                                  const String& unit, const String& category) {
+    registerMetric(name, MetricType::GAUGE, description, unit, category);
 }
 
-void MetricsSystem::registerHistogram(const String& name, const String& description) {
-    registerMetric(name, MetricType::HISTOGRAM, description);
+void MetricsSystem::registerHistogram(const String& name, const String& description,
+                                      const String& unit, const String& category) {
+    registerMetric(name, MetricType::HISTOGRAM, description, unit, category);
 }
-
-void MetricsSystem::incrementCounter(const String& name, int64_t value) {
-    std::lock_guard<std::mutex> lock(metricsMutex);
-    
-    auto it = metrics.find(name);
-    if (it == metrics.end() || it->second.type != MetricType::COUNTER) {
-        return;
-    }
-
-    bootMetrics[name].counter += value;
-    MetricValue metric = {millis(), {.counter = value}};
-    logger.logMetric(name.c_str(), &metric, sizeof(metric));
-}
-
-void MetricsSystem::setGauge(const String& name, double value) {
-    std::lock_guard<std::mutex> lock(metricsMutex);
-    
-    auto it = metrics.find(name);
-    if (it == metrics.end() || it->second.type != MetricType::GAUGE) {
-        return;
-    }
-
-    bootMetrics[name].gauge = value;
-    MetricValue metric = {millis(), {.gauge = value}};
-    logger.logMetric(name.c_str(), &metric, sizeof(metric));
-}
-
-void MetricsSystem::recordHistogram(const String& name, double value) {
-    std::lock_guard<std::mutex> lock(metricsMutex);
-    
-    auto it = metrics.find(name);
-    if (it == metrics.end() || it->second.type != MetricType::HISTOGRAM) {
-        return;
-    }
-
-    auto& hist = bootMetrics[name].histogram;
-    if (hist.count == 0) {
-        hist.min = hist.max = value;
-    } else {
-        hist.min = std::min(hist.min, value);
-        hist.max = std::max(hist.max, value);
-    }
-    hist.sum += value;
-    hist.count++;
-    hist.value = hist.sum / hist.count;
-
-    MetricValue metric = {millis(), {.histogram = {value, value, value, value, 1}}};
-    logger.logMetric(name.c_str(), &metric, sizeof(metric));
-}
-
 MetricValue MetricsSystem::getMetric(const String& name, bool fromBoot) {
     std::lock_guard<std::mutex> lock(metricsMutex);
-    
+
     auto it = metrics.find(name);
     if (it == metrics.end()) {
         return MetricValue{};
@@ -179,37 +117,44 @@ MetricValue MetricsSystem::getMetric(const String& name, bool fromBoot) {
         return bootMetrics[name];
     }
 
-    // Get historical data
-    std::vector<MetricValue> values;
-    logger.queryMetrics(name.c_str(), 0, values); // 0 = all time
+    std::vector<uLogger::Record> records;
+    logger.queryMetrics(name.c_str(), 0, records); // Fetch records
 
-    if (values.empty()) {
+    if (records.empty()) {
         return MetricValue{};
     }
 
     MetricValue result = {millis(), {}};
     switch (it->second.type) {
-        case MetricType::COUNTER: {
+        case MetricType::COUNTER:
             result.counter = 0;
-            for (const auto& v : values) {
-                result.counter += v.counter;
+            for (const auto& record : records) {
+                int64_t value;
+                memcpy(&value, record.data, sizeof(value));
+                result.counter += value;
             }
             break;
-        }
         case MetricType::GAUGE:
-            result = values.back(); // Most recent value
+            memcpy(&result.gauge, records.back().data, sizeof(result.gauge)); // Most recent value
             break;
         case MetricType::HISTOGRAM:
-            result = calculateHistogram(values);
+            std::vector<MetricValue> histValues;
+            for (const auto& record : records) {
+                MetricValue hist;
+                memcpy(&hist.histogram, record.data, sizeof(hist.histogram));
+                histValues.push_back(hist);
+            }
+            result = calculateHistogram(histValues);
             break;
     }
 
     return result;
 }
 
+
 MetricValue MetricsSystem::calculateHistogram(const std::vector<MetricValue>& values) {
     MetricValue result = {millis(), {.histogram = {0.0, 0.0, 0.0, 0.0, 0}}};
-    
+
     if (values.empty()) {
         return result;
     }
@@ -226,7 +171,7 @@ MetricValue MetricsSystem::calculateHistogram(const std::vector<MetricValue>& va
         hist.sum += v.histogram.value;
     }
 
-    hist.value = hist.sum / hist.count; // mean
+    hist.value = hist.sum / hist.count;
     return result;
 }
 
@@ -250,35 +195,29 @@ void MetricsSystem::updateSystemMetrics() {
         lastSaveTime = now;
     }
 }
-
 bool MetricsSystem::saveBootMetrics() {
     std::lock_guard<std::mutex> lock(metricsMutex);
-    
+
     File file = LittleFS.open(BOOT_METRICS_FILE, "w");
     if (!file) {
         log_e("Failed to open boot metrics file for writing");
         return false;
     }
 
-    // Save metrics configuration
-    DynamicJsonDocument doc(2048);
+    // Use StaticJsonDocument if the size is known at compile time.
+    JsonDocument doc;
     JsonObject root = doc.to<JsonObject>();
-    
+
     for (const auto& pair : metrics) {
-        JsonObject metric = root.createNestedObject(pair.first);
+        JsonObject metric = root[pair.first].to<JsonObject>();
         metric["type"] = static_cast<int>(pair.second.type);
         metric["description"] = pair.second.description;
+        metric["unit"] = pair.second.unit;
+        metric["category"] = pair.second.category;
     }
 
     if (serializeJson(doc, file) == 0) {
         log_e("Failed to write metrics configuration");
-        file.close();
-        return false;
-    }
-
-    // Save boot metrics values
-    if (!file.write((uint8_t*)&bootMetrics, sizeof(bootMetrics))) {
-        log_e("Failed to write boot metrics values");
         file.close();
         return false;
     }
@@ -296,7 +235,7 @@ bool MetricsSystem::loadBootMetrics() {
     }
 
     // Load metrics configuration
-    DynamicJsonDocument doc(2048);
+    JsonDocument doc;
     DeserializationError error = deserializeJson(doc, file);
     if (error) {
         log_e("Failed to parse metrics configuration");

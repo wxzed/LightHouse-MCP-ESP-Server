@@ -8,17 +8,8 @@
 #include <memory>
 #include "uLogger.h"
 
-class MetricsSystem {
-public:
-    // Metric types supported by the system
-    enum class MetricType {
-        COUNTER,    // Incremental values
-        GAUGE,      // Point-in-time values
-        HISTOGRAM   // Statistical distribution
-    };
-
-    // Structure to hold metric values
-    struct MetricValue {
+namespace mcp{
+struct MetricValue {
         uint64_t timestamp;
         union {
             int64_t counter;
@@ -33,6 +24,17 @@ public:
         };
     };
 
+class MetricsSystem {
+public:
+    // Metric types supported by the system
+    enum class MetricType {
+        COUNTER,    // Incremental values
+        GAUGE,      // Point-in-time values
+        HISTOGRAM   // Statistical distribution
+    };
+
+    // Structure to hold metric values
+   
     // Metadata about a metric
     struct MetricInfo {
         String name;
@@ -211,8 +213,6 @@ private:
     uint32_t startTime;
 };
 
-// Convenience macro for getting metrics instance
-#define METRICS MetricsSystem::getInstance()
-
 // Macro for timing a scoped operation
 #define METRIC_TIMER(name) MetricTimer __timer(name)
+} // namespace mcp
