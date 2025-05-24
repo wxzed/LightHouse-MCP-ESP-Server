@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ESP32 MCP Server</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .server-info {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+        .server-info p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .resources {
+            margin-top: 20px;
+        }
+        .resource {
+            padding: 15px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+        }
+        .resource h3 {
+            margin: 0 0 10px 0;
+            color: #1976d2;
+        }
+        .resource p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        #log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+        .log-entry.error {
+            color: #c62828;
+            background-color: #ffebee;
+        }
+        .log-entry.success {
+            color: #2e7d32;
+            background-color: #e8f5e9;
+        }
+        .log-entry.info {
+            color: #1565c0;
+            background-color: #e3f2fd;
+        }
+        .debug-controls {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+        button {
+            padding: 8px 15px;
+            margin: 5px;
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1565c0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ESP32 MCP Server</h1>
+        <div id="status" class="status">Connecting...</div>
+        <div id="server-info" class="server-info">
+            <h3>Server Information</h3>
+            <p>Name: <span id="server-name">-</span></p>
+            <p>Version: <span id="server-version">-</span></p>
+            <p>IP Address: <span id="server-ip">-</span></p>
+            <p>WebSocket URL: <span id="ws-url">-</span></p>
+        </div>
+        <div id="resources" class="resources">
+            <h3>Available Resources</h3>
+            <div id="resources-list"></div>
+        </div>
+        <div class="debug-controls">
+            <h3>Debug Controls</h3>
+            <button onclick="testConnection()">Test Connection</button>
+            <button onclick="clearLog()">Clear Log</button>
+            <button onclick="reconnect()">Reconnect</button>
+        </div>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT_ATTEMPTS = 5;
+        
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            document.getElementById('ws-url').textContent = wsUrl;
+            
+            log('Attempting to connect to: ' + wsUrl, 'info');
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = () => {
+                    log('WebSocket connection established', 'success');
+                    document.getElementById('status').textContent = 'Connected';
+                    document.getElementById('status').className = 'status';
+                    reconnectAttempts = 0;
+                    initialize();
+                };
+                
+                ws.onclose = (event) => {
+                    log(`WebSocket closed. Code: ${event.code}, Reason: ${event.reason}`, 'error');
+                    document.getElementById('status').textContent = 'Disconnected';
+                    document.getElementById('status').className = 'status error';
+                    
+                    if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                        reconnectAttempts++;
+                        log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`, 'info');
+                        setTimeout(connect, 2000);
+                    } else {
+                        log('Max reconnection attempts reached', 'error');
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    log('WebSocket error: ' + JSON.stringify(error), 'error');
+                    document.getElementById('status').textContent = 'Connection error';
+                    document.getElementById('status').className = 'status error';
+                };
+                
+                ws.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        log('Received message: ' + JSON.stringify(message, null, 2), 'info');
+                        handleMessage(message);
+                    } catch (error) {
+                        log('Error parsing message: ' + error.message, 'error');
+                    }
+                };
+            } catch (error) {
+                log('Error creating WebSocket: ' + error.message, 'error');
+            }
+        }
+        
+        function initialize() {
+            log('Sending initialize request...', 'info');
+            sendRequest('initialize', {}).then(response => {
+                log('Initialize response: ' + JSON.stringify(response, null, 2), 'info');
+                if (response.result) {
+                    document.getElementById('server-name').textContent = response.result.serverName || '-';
+                    document.getElementById('server-version').textContent = response.result.serverVersion || '-';
+                    document.getElementById('server-ip').textContent = window.location.hostname;
+                    log('Server initialized successfully', 'success');
+                    listResources();
+                } else {
+                    log('Initialize failed: ' + JSON.stringify(response), 'error');
+                }
+            }).catch(error => {
+                log('Initialize error: ' + error.message, 'error');
+            });
+        }
+        
+        function listResources() {
+            log('Requesting resource list...', 'info');
+            sendRequest('resources/list', {}).then(response => {
+                log('Resource list response: ' + JSON.stringify(response, null, 2), 'info');
+                const resourcesList = document.getElementById('resources-list');
+                resourcesList.innerHTML = '';
+                
+                if (response.result && response.result.resources) {
+                    response.result.resources.forEach(resource => {
+                        const resourceDiv = document.createElement('div');
+                        resourceDiv.className = 'resource';
+                        resourceDiv.innerHTML = `
+                            <h3>${resource.name}</h3>
+                            <p>URI: ${resource.uri}</p>
+                            <p>Type: ${resource.type}</p>
+                            <p>Description: ${resource.description || '-'}</p>
+                        `;
+                        resourcesList.appendChild(resourceDiv);
+                    });
+                    log(`Found ${response.result.resources.length} resources`, 'success');
+                } else {
+                    resourcesList.innerHTML = '<p>No resources available</p>';
+                    log('No resources found', 'info');
+                }
+            }).catch(error => {
+                log('Error listing resources: ' + error.message, 'error');
+            });
+        }
+        
+        function sendRequest(method, params) {
+            return new Promise((resolve, reject) => {
+                if (!ws || ws.readyState !== WebSocket.OPEN) {
+                    const error = new Error('WebSocket is not connected');
+                    log(error.message, 'error');
+                    reject(error);
+                    return;
+                }
+                
+                const request = {
+                    jsonrpc: '2.0',
+                    method: method,
+                    params: params,
+                    id: Date.now()
+                };
+                
+                log('Sending request: ' + JSON.stringify(request, null, 2), 'info');
+                ws.send(JSON.stringify(request));
+                
+                const handler = (event) => {
+                    try {
+                        const response = JSON.parse(event.data);
+                        if (response.id === request.id) {
+                            ws.removeEventListener('message', handler);
+                            resolve(response);
+                        }
+                    } catch (error) {
+                        log('Error handling response: ' + error.message, 'error');
+                        reject(error);
+                    }
+                };
+                
+                ws.addEventListener('message', handler);
+            });
+        }
+        
+        function handleMessage(message) {
+            if (message.method === 'notifications/resources/updated') {
+                log(`Resource updated: ${message.params.uri}`, 'info');
+                listResources();
+            }
+        }
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function testConnection() {
+            log('Testing connection...', 'info');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('WebSocket is connected', 'success');
+                initialize();
+            } else {
+                log('WebSocket is not connected', 'error');
+                reconnect();
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        function reconnect() {
+            log('Manual reconnection requested...', 'info');
+            if (ws) {
+                ws.close();
+            }
+            reconnectAttempts = 0;
+            connect();
+        }
+        
+        // Connect when page loads
+        connect();
+    </script>
+</body>
+</html> 

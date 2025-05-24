@@ -21,29 +21,39 @@ void mcpTask(void* parameter) {
 
 void setup() {
     Serial.begin(115200);
-    Serial.println("Starting up...");
+    Serial.println("\n\n=== ESP32 MCP Server Starting ===");
+    Serial.println("Initializing...");
 
     // Initialize LittleFS
-    if (!LittleFS.begin(true)) {
-        Serial.println("LittleFS Mount Failed");
-        return;
+    if (LittleFS.begin()) {
+        Serial.println("LittleFS mounted successfully");
+    } else {
+        Serial.println("LittleFS mount failed!");
     }
 
-    // Start network manager
+    // Initialize network
+    Serial.println("Starting network manager...");
     networkManager.begin();
 
-    // Wait for network connection or AP mode
-    while (!networkManager.isConnected() && networkManager.getIPAddress().isEmpty()) {
+    // Wait for network connection
+    Serial.println("Waiting for network connection...");
+    while (!networkManager.isConnected()) {
         delay(100);
     }
 
-    Serial.print("Device IP: ");
+    Serial.println("\n=== Network Status ===");
+    Serial.print("Connected to: ");
+    Serial.println(networkManager.getSSID());
+    Serial.print("IP Address: ");
     Serial.println(networkManager.getIPAddress());
+    Serial.println("=====================\n");
 
-    // Initialize MCP server
+    // Start MCP server
+    Serial.println("Starting MCP server...");
     mcpServer.begin(networkManager.isConnected());
 
     // Create MCP task
+    Serial.println("Creating MCP task...");
     xTaskCreatePinnedToCore(
         mcpTask,
         "MCPTask",
@@ -53,10 +63,10 @@ void setup() {
         &mcpTaskHandle,
         1  // Run on core 1
     );
+    Serial.println("Setup complete!");
 }
 
 void loop() {
-    // Main loop can be used for other tasks
-    // Network and MCP handling is done in their respective tasks
-    delay(1000);
+    // Handle MCP server
+    mcpServer.handleClient();
 }

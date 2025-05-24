@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LightHouse MCP Learning Center</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .menu {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .menu-item {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        .menu-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .menu-item h2 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .menu-item p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .menu-item a {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .menu-item a:hover {
+            background-color: #0056b3;
+        }
+        .status-bar {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>LightHouse MCP Learning Center</h1>
+            <p>Learn about Model Context Protocol (MCP) through interactive examples and exercises</p>
+        </div>
+
+        <div class="menu">
+            <div class="menu-item">
+                <h2>MCP Basics</h2>
+                <p>Learn the fundamental concepts of MCP and how it works</p>
+                <a href="/mcp_basics.html">Start Learning</a>
+            </div>
+
+            <div class="menu-item">
+                <h2>Hands-on Exercises</h2>
+                <p>Step-by-step exercises to practice MCP communication</p>
+                <a href="/exercises.html">View Exercises</a>
+            </div>
+
+            <div class="menu-item">
+                <h2>Challenge Projects</h2>
+                <p>Advanced projects to test your MCP knowledge</p>
+                <a href="/challenges.html">Take Challenges</a>
+            </div>
+
+            <div class="menu-item">
+                <h2>Debugging Guide</h2>
+                <p>Learn how to troubleshoot common MCP issues</p>
+                <a href="/debugging.html">Debug Guide</a>
+            </div>
+
+            <div class="menu-item">
+                <h2>Interactive Playground</h2>
+                <p>Try MCP commands in real-time with our interactive console</p>
+                <a href="/playground.html">Open Playground</a>
+            </div>
+
+            <div class="menu-item">
+                <h2>Resources & References</h2>
+                <p>Additional resources and documentation</p>
+                <a href="/resources.html">View Resources</a>
+            </div>
+        </div>
+
+        <div class="status-bar" id="status">
+            Connecting to MCP server...
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection for status updates
+        const ws = new WebSocket(`ws://${window.location.hostname}/ws`);
+        
+        ws.onopen = () => {
+            document.getElementById('status').textContent = 'Connected to MCP server';
+        };
+        
+        ws.onclose = () => {
+            document.getElementById('status').textContent = 'Disconnected from MCP server';
+        };
+        
+        ws.onerror = (error) => {
+            document.getElementById('status').textContent = 'Error connecting to MCP server';
+        };
+    </script>
+</body>
+</html> 

@@ -1,22 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>ESP32 Network Setup</title>
+    <title>ESP32 WiFi Setup</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { 
+        body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
-            background: #f0f0f0;
+            background-color: #f0f0f0;
         }
         .container {
             max-width: 400px;
             margin: 0 auto;
-            background: white;
+            background-color: white;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
         }
         .form-group {
             margin-bottom: 15px;
@@ -24,7 +29,7 @@
         label {
             display: block;
             margin-bottom: 5px;
-            font-weight: bold;
+            color: #666;
         }
         input[type="text"],
         input[type="password"] {
@@ -35,46 +40,43 @@
             box-sizing: border-box;
         }
         button {
-            background: #007bff;
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
             color: white;
             border: none;
-            padding: 10px 15px;
             border-radius: 4px;
             cursor: pointer;
-            width: 100%;
         }
         button:hover {
-            background: #0056b3;
+            background-color: #45a049;
         }
         #status {
             margin-top: 20px;
             padding: 10px;
             border-radius: 4px;
+            display: none;
         }
-        .connected {
-            background: #d4edda;
-            color: #155724;
-        }
-        .connecting {
-            background: #fff3cd;
-            color: #856404;
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
         }
         .error {
-            background: #f8d7da;
-            color: #721c24;
+            background-color: #f2dede;
+            color: #a94442;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Network Setup</h2>
-        <form id="wifi-form">
+        <h1>ESP32 WiFi Setup</h1>
+        <form id="wifiForm">
             <div class="form-group">
-                <label for="ssid">WiFi Name (SSID):</label>
+                <label for="ssid">WiFi SSID:</label>
                 <input type="text" id="ssid" name="ssid" required>
             </div>
             <div class="form-group">
-                <label for="password">Password:</label>
+                <label for="password">WiFi Password:</label>
                 <input type="password" id="password" name="password" required>
             </div>
             <button type="submit">Connect</button>
@@ -83,73 +85,37 @@
     </div>
 
     <script>
-        const form = document.getElementById('wifi-form');
-        const status = document.getElementById('status');
-        let ws = null;
-
-        function connectWebSocket() {
-            ws = new WebSocket(`ws://${window.location.hostname}/ws`);
-            
-            ws.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                updateStatus(data);
-            };
-            
-            ws.onclose = function() {
-                setTimeout(connectWebSocket, 2000);
-            };
-        }
-
-        function updateStatus(data) {
-            status.innerHTML = `
-                Status: ${data.status}<br>
-                SSID: ${data.ssid}<br>
-                IP: ${data.ip}
-            `;
-            
-            status.className = '';
-            switch(data.status) {
-                case 'connected':
-                    status.classList.add('connected');
-                    break;
-                case 'connecting':
-                    status.classList.add('connecting');
-                    break;
-                case 'connection_failed':
-                    status.classList.add('error');
-                    break;
-            }
-        }
-
-        form.onsubmit = async (e) => {
+        document.getElementById('wifiForm').onsubmit = function(e) {
             e.preventDefault();
-            const formData = new FormData(form);
             
-            try {
-                const response = await fetch('/save', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Network configuration failed');
-                }
-                
-                status.innerHTML = 'Connecting to network...';
-                status.className = 'connecting';
-            } catch (error) {
-                status.innerHTML = error.message;
-                status.className = 'error';
-            }
-        };
-
-        // Initial status check and WebSocket connection
-        fetch('/status')
-            .then(response => response.json())
+            const ssid = document.getElementById('ssid').value;
+            const password = document.getElementById('password').value;
+            const status = document.getElementById('status');
+            
+            fetch('/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(password)}`
+            })
+            .then(response => response.text())
             .then(data => {
-                updateStatus(data);
-                connectWebSocket();
+                status.style.display = 'block';
+                if (data.includes('saved')) {
+                    status.className = 'success';
+                    status.textContent = 'Credentials saved! Device will now attempt to connect...';
+                } else {
+                    status.className = 'error';
+                    status.textContent = 'Error: ' + data;
+                }
+            })
+            .catch(error => {
+                status.style.display = 'block';
+                status.className = 'error';
+                status.textContent = 'Error: ' + error;
             });
+        };
     </script>
 </body>
 </html>

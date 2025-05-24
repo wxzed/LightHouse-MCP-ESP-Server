@@ -1,166 +1,100 @@
+# LightHouse MCP-ESP Server
 
-# ESP32 MCP Server
-
-A [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) implementation for ESP32 microcontrollers, providing a WebSocket-based interface for resource discovery and monitoring.
-
-## Status: Not Compiling, initial commit as is from the model
-
-Created with Claude 3.5 Sonet on the commit date (with minor obvioud fixes with automatic formating, etc.)
-
-![architecture](docs/img/ESP32MCPServer.png)
+A powerful ESP32-based server implementing the Model Context Protocol (MCP) for IoT devices. This project provides a robust foundation for building IoT applications with features like WiFi management, WebSocket communication, and a modern web interface.
 
 ## Features
 
-- MCP protocol implementation (v0.1.0)
-- WebSocket server for real-time updates
-- Resource discovery and monitoring
-- WiFi configuration via web interface
-- Thread-safe request handling
-- Comprehensive test suite
-- AsyncWebServer integration
-- LittleFS support for configuration storage
+- **WiFi Management**
+  - Automatic AP mode when no credentials are found
+  - Secure credential storage
+  - Automatic reconnection handling
+  - Web-based WiFi configuration
 
-## Prerequisites
+- **MCP Protocol Implementation**
+  - Resource discovery and management
+  - Real-time updates via WebSocket
+  - JSON-RPC 2.0 compliant
+  - Subscription system for resource updates
 
-### Hardware
+- **Web Interface**
+  - Modern, responsive design
+  - Interactive MCP command console
+  - Real-time status updates
+  - Learning center with examples
 
-- ESP32 S3 DevKitC-1 board
-- USB cable for programming
+## Requirements
 
-### Software
-
-- PlatformIO Core (CLI) or PlatformIO IDE
-- Python 3.7 or higher
-- Git
-
-## Architecture
-
-```mermaid
-flowchart TD
-    Start[Start Application] --> Setup[Setup]
-    Setup -->|Initialize Filesystem| InitFS[Initialize LittleFS]
-    Setup -->|Start Network| StartNetwork[Initialize Network Manager]
-    Setup -->|Create Tasks| CreateTasks[Create and Assign Tasks]
-
-    subgraph Network
-        StartNetwork --> APCheck[Check AP or Connect Mode]
-        APCheck -->|Credentials Exist| Connect[Connect to WiFi]
-        APCheck -->|No Credentials| StartAP[Start Access Point]
-        Connect --> NetworkReady[Network Ready]
-        StartAP --> NetworkReady
-    end
-
-    subgraph MCP_Server
-        MCP[Start MCP Server] --> HandleClient[Handle Client Connections]
-        HandleClient --> HandleRequest[Handle Requests]
-        HandleRequest -->|WebSocket Events| WebSocket[Handle WebSocket]
-        HandleRequest -->|HTTP Endpoints| HTTP[Process HTTP Requests]
-    end
-
-    subgraph Metrics
-        self[Start Metrics System] --> InitMetrics[Initialize System Metrics]
-        InitMetrics --> CollectMetrics[Collect Metrics Periodically]
-        CollectMetrics --> SaveMetrics[Save Metrics to Filesystem]
-    end
-
-    subgraph Logger
-        self[Start uLogger] --> LogMetrics[Log Metrics Data]
-        LogMetrics --> CompactLogs[Compact Logs if Necessary]
-        CompactLogs -->|Rotates Logs| LogRotation
-    end
-
-    CreateTasks -->|Network Task| NetworkTask[Run Network Task on Core]
-    CreateTasks -->|MCP Task| MCPTask[Run MCP Server Task on Core]
-    NetworkTask --> Network
-    MCPTask --> MCP_Server
-    MCP_Server --> Metrics
-    Metrics --> Logger
-
-
-```
+- ESP32 development board
+- PlatformIO IDE or Arduino IDE
+- Required libraries:
+  - ESPAsyncWebServer
+  - AsyncTCP
+  - ArduinoJson
+  - LittleFS
+  - Preferences
 
 ## Installation
 
 1. Clone the repository:
-
-```bash
-git clone https://github.com/yourusername/esp32-mcp-server.git
-cd esp32-mcp-server
-```
+   ```bash
+   git clone https://github.com/yourusername/LightHouse-MCP-ESP-Server.git
+   cd LightHouse-MCP-ESP-Server
+   ```
 
 2. Install dependencies:
+   ```bash
+   pio pkg install
+   ```
 
-```bash
-pio pkg install
-```
+3. Build and upload:
+   ```bash
+   pio run -t upload
+   ```
 
-3. Build and upload the filesystem:
-
-```bash
-pio run -t uploadfs
-```
-
-4. Build and upload the firmware:
-
-```bash
-pio run -t upload
-```
+4. Upload filesystem:
+   ```bash
+   pio run -t uploadfs
+   ```
 
 ## Usage
 
-### Initial Setup
+1. Power on the ESP32
+2. Connect to the ESP32's WiFi network (SSID format: ESP32_XXXXXX)
+3. Open a web browser and navigate to:
+   - `http://192.168.4.1` - Main interface
+   - `http://192.168.4.1/mcp_basics.html` - MCP learning center
 
-1. Power on the ESP32. It will create an access point named "ESP32_XXXXXX"
-2. Connect to the access point
-3. Navigate to <http://192.168.4.1>
-4. Configure your WiFi credentials
-5. The device will connect to your network
+## Development
 
-### MCP Connection
-
-Connect to the MCP server using WebSocket on port 9000:
-
-```javascript
-const ws = new WebSocket('ws://YOUR_ESP32_IP:9000');
-
-// Initialize connection
-ws.send(JSON.stringify({
-    jsonrpc: "2.0",
-    method: "initialize",
-    id: 1
-}));
-
-// List available resources
-ws.send(JSON.stringify({
-    jsonrpc: "2.0",
-    method: "resources/list",
-    id: 2
-}));
+### Project Structure
+```
+├── data/               # Web interface files
+├── src/               # Source code
+├── include/           # Header files
+├── test/              # Unit tests
+└── platformio.ini     # Project configuration
 ```
 
-## Testing
+### Adding New Features
 
-Run the test suite:
+1. Create new MCP resources in `include/MCPTypes.h`
+2. Implement handlers in `src/MCPServer.cpp`
+3. Add web interface components in `data/`
 
-```bash
-# Run all tests
-pio test -e native
+## License
 
-# Run specific test
-pio test -e native -f test_request_queue
-
-# Run with coverage
-pio test -e native --coverage
-```
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Contributing
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## License
+## Acknowledgments
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- ESP32 Arduino Core team
+- PlatformIO team
+- All contributors and users
