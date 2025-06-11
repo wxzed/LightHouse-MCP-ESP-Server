@@ -166,15 +166,130 @@ void NetworkManager::onWebSocketEvent(AsyncWebSocket* server,
                                     void* arg, 
                                     uint8_t* data, 
                                     size_t len) {
+    Serial.print("onWebSocketEvent type =");    
+    Serial.println(type);                                    
     switch (type) {
         case WS_EVT_CONNECT:
-            client->text(getNetworkStatusJson(state, getSSID(), getIPAddress()));
+            Serial.println("WebSocket client connected");
+            //client->text(getNetworkStatusJson(state, getSSID(), getIPAddress()));
             break;
         case WS_EVT_DISCONNECT:
+            Serial.println("WebSocket client disconnected");
             break;
         case WS_EVT_ERROR:
+            Serial.println("WebSocket error");
             break;
         case WS_EVT_DATA:
+            Serial.println("WebSocket data received");
+            if (len > 0) {
+                // 将接收到的数据转换为字符串
+                String message = String((char*)data, len);
+                Serial.print("Received message: ");
+                Serial.println(message);
+                
+                // 解析JSON消息
+                DynamicJsonDocument doc(1024);
+                DeserializationError error = deserializeJson(doc, message);
+                
+                if (error) {
+                    Serial.print("JSON parsing failed: ");
+                    Serial.println(error.c_str());
+                    return;
+                }
+                
+                // 处理不同类型的消息
+                if (doc.containsKey("method")) {
+                    String method = doc["method"].as<String>();
+                    Serial.print("Method: ");
+                    Serial.println(method);
+                    
+                    // 处理初始化请求
+                    if (method == "initialize") {
+                        DynamicJsonDocument response(1024);
+                        response["jsonrpc"] = "2.0";
+                        response["id"] = doc["id"];
+                        response["result"]["serverName"] = "ESP32-MCP-Server";
+                        response["result"]["serverVersion"] = "1.0.0";
+                        String responseStr;
+                        serializeJson(response, responseStr);
+                        client->text(responseStr);
+                    }
+                    // 处理资源列表请求
+                    else if (method == "resources/list") {
+                        DynamicJsonDocument response(1024);
+                        response["jsonrpc"] = "2.0";
+                        response["id"] = doc["id"];
+                        JsonArray resources = response["result"]["resources"].to<JsonArray>();
+                        
+                        // 添加示例资源
+                        JsonObject resource1 = resources.createNestedObject();
+                        resource1["name"] = "LED";
+                        resource1["uri"] = "led://status";
+                        resource1["type"] = "boolean";
+                        
+                        String responseStr;
+                        serializeJson(response, responseStr);
+                        client->text(responseStr);
+                    }
+                    // 处理tools/list请求
+                    else if (method == "tools/list") {
+                        DynamicJsonDocument response(1024);
+                        response["jsonrpc"] = "2.0";
+                        response["id"] = doc["id"];
+                        JsonObject result = response.createNestedObject("result");
+                        JsonArray tools = result.createNestedArray("tools");
+                        JsonObject tool = tools.createNestedObject();
+                        tool["name"] = "led_control";
+                        tool["description"] = "控制ESP32板载LED的开关";
+                        JsonObject inputSchema = tool.createNestedObject("inputSchema");
+                        inputSchema["type"] = "object";
+                        JsonObject props = inputSchema.createNestedObject("properties");
+                        JsonObject onProp = props.createNestedObject("on");
+                        onProp["type"] = "boolean";
+                        onProp["description"] = "true为打开LED，false为关闭LED";
+                        JsonArray required = inputSchema.createNestedArray("required");
+                        required.add("on");
+                        String responseStr;
+                        serializeJson(response, responseStr);
+                        client->text(responseStr);
+                    }
+                    // 处理tools/call请求
+                    else if (method == "tools/call") {
+                        String toolName = doc["params"]["name"].as<String>();
+                        if (toolName == "led_control") {
+                            if (!doc["params"]["arguments"].containsKey("on")) {
+                                DynamicJsonDocument errorResp(256);
+                                errorResp["jsonrpc"] = "2.0";
+                                errorResp["id"] = doc["id"];
+                                JsonObject result = errorResp.createNestedObject("result");
+                                JsonArray contentArr = result.createNestedArray("content");
+                                JsonObject contentObj = contentArr.createNestedObject();
+                                contentObj["type"] = "text";
+                                contentObj["text"] = "参数错误，缺少on字段";
+                                result["isError"] = true;
+                                String errorStr;
+                                serializeJson(errorResp, errorStr);
+                                client->text(errorStr);
+                                return;
+                            }
+                            bool on = doc["params"]["arguments"]["on"].as<bool>();
+                            digitalWrite(2, on ? HIGH : LOW); // GPIO2
+                            DynamicJsonDocument resp(256);
+                            resp["jsonrpc"] = "2.0";
+                            resp["id"] = doc["id"];
+                            JsonObject result = resp.createNestedObject("result");
+                            JsonArray contentArr = result.createNestedArray("content");
+                            JsonObject contentObj = contentArr.createNestedObject();
+                            contentObj["type"] = "text";
+                            contentObj["text"] = on ? "LED已打开" : "LED已关闭";
+                            result["isError"] = false;
+                            String respStr;
+                            serializeJson(resp, respStr);
+                            client->text(respStr);
+                        }
+                    }
+                }
+            }
             break;
     }
 }

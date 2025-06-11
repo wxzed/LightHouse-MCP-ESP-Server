@@ -28,6 +28,7 @@ public:
     void handleInitialize(uint8_t clientId, const RequestId &id, const JsonObject &params);
     void handleResourcesList(uint8_t clientId, const RequestId &id, const JsonObject &params);
     void handleResourceRead(uint8_t clientId, const RequestId &id, const JsonObject &params);
+    void handleResourceWrite(uint8_t clientId, const RequestId &id, const JsonObject &params);
     void handleSubscribe(uint8_t clientId, const RequestId &id, const JsonObject &params);
     void handleUnsubscribe(uint8_t clientId, const RequestId &id, const JsonObject &params);
     void unregisterResource(const std::string &uri);

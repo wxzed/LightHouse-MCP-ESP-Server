@@ -23,7 +23,8 @@ void setup() {
     Serial.begin(115200);
     Serial.println("\n\n=== ESP32 MCP Server Starting ===");
     Serial.println("Initializing...");
-
+    pinMode(2, OUTPUT);
+    digitalWrite(2, LOW);
     // Initialize LittleFS
     if (LittleFS.begin()) {
         Serial.println("LittleFS mounted successfully");

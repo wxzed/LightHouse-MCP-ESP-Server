@@ -1,0 +1,9 @@
+{
+    "servers": [
+        {
+            "name": "ESP32-MCP",
+            "url": "ws://192.168.1.35/ws",
+            "description": "ESP32 MCP服务器"
+        }
+    ]
+} 

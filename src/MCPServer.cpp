@@ -1,5 +1,6 @@
 #include "MCPServer.h"
 #include "MCPTypes.h"
+#include <iostream>
 
 using namespace mcp;
 
@@ -14,6 +15,11 @@ void MCPServer::handleClient() {
 }
 
 void MCPServer::handleInitialize(uint8_t clientId, const RequestId &id, const JsonObject &params) {
+    std::cout << "收到初始化请求 - 客户端ID: " << (int)clientId << std::endl;
+    std::cout << "请求参数: ";
+    serializeJson(params, std::cout);
+    std::cout << std::endl;
+
     JsonDocument doc;
     JsonObject result = doc["result"].to<JsonObject>();
     result["serverName"] = serverInfo.name;
@@ -23,6 +29,11 @@ void MCPServer::handleInitialize(uint8_t clientId, const RequestId &id, const Js
 }
 
 void MCPServer::handleResourcesList(uint8_t clientId, const RequestId &id, const JsonObject &params) {
+    std::cout << "收到资源列表请求 - 客户端ID: " << (int)clientId << std::endl;
+    std::cout << "请求参数: ";
+    serializeJson(params, std::cout);
+    std::cout << std::endl;
+
     JsonDocument doc;
     JsonArray resourcesArray = doc["resources"].to<JsonArray>();
 
@@ -34,6 +45,11 @@ void MCPServer::handleResourcesList(uint8_t clientId, const RequestId &id, const
 }
 
 void MCPServer::handleResourceRead(uint8_t clientId, const RequestId &id, const JsonObject &params) {
+    std::cout << "收到资源读取请求 - 客户端ID: " << (int)clientId << std::endl;
+    std::cout << "请求参数: ";
+    serializeJson(params, std::cout);
+    std::cout << std::endl;
+
     if (!params["uri"].is<std::string>()) {
         sendError(clientId, id, 400, "Invalid URI");
         return;
@@ -48,6 +64,11 @@ void MCPServer::handleResourceRead(uint8_t clientId, const RequestId &id, const 
 }
 
 void MCPServer::handleSubscribe(uint8_t clientId, const RequestId &id, const JsonObject &params) {
+    std::cout << "收到订阅请求 - 客户端ID: " << (int)clientId << std::endl;
+    std::cout << "请求参数: ";
+    serializeJson(params, std::cout);
+    std::cout << std::endl;
+
     if (!params["uri"].is<std::string>()) {
         sendError(clientId, id, 400, "Invalid URI");
         return;
@@ -57,6 +78,11 @@ void MCPServer::handleSubscribe(uint8_t clientId, const RequestId &id, const Jso
 }
 
 void MCPServer::handleUnsubscribe(uint8_t clientId, const RequestId &id, const JsonObject &params) {
+    std::cout << "收到取消订阅请求 - 客户端ID: " << (int)clientId << std::endl;
+    std::cout << "请求参数: ";
+    serializeJson(params, std::cout);
+    std::cout << std::endl;
+
     if (!params["uri"].is<std::string>()) {
         sendError(clientId, id, 400, "Invalid URI");
         return;
@@ -72,11 +98,15 @@ void MCPServer::unregisterResource(const std::string &uri) {
 }
 
 void MCPServer::sendResponse(uint8_t clientId, const RequestId &id, const MCPResponse &response) {
+    std::cout << "发送响应 - 客户端ID: " << (int)clientId << std::endl;
+    std::cout << "响应内容: ";
     JsonDocument doc;
     doc["id"] = id;
     doc["success"] = response.success;
     doc["message"] = response.message;
     doc["data"] = response.data;
+    serializeJson(doc, std::cout);
+    std::cout << std::endl;
 
     std::string jsonResponse;
     serializeJson(doc, jsonResponse);
@@ -84,6 +114,10 @@ void MCPServer::sendResponse(uint8_t clientId, const RequestId &id, const MCPRes
 }
 
 void MCPServer::sendError(uint8_t clientId, const RequestId &id, int code, const std::string &message) {
+    std::cout << "发送错误 - 客户端ID: " << (int)clientId << std::endl;
+    std::cout << "错误代码: " << code << std::endl;
+    std::cout << "错误信息: " << message << std::endl;
+
     JsonDocument doc;
     JsonObject error = doc["error"].to<JsonObject>();
     error["code"] = code;
@@ -103,6 +137,8 @@ void MCPServer::broadcastResourceUpdate(const std::string &uri) {
 }
 
 MCPRequest MCPServer::parseRequest(const std::string &json) {
+    std::cout << "收到原始请求数据: " << json << std::endl;
+
     JsonDocument doc;
     deserializeJson(doc, json);
 
