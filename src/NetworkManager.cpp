@@ -208,8 +208,18 @@ void NetworkManager::onWebSocketEvent(AsyncWebSocket* server,
                         DynamicJsonDocument response(1024);
                         response["jsonrpc"] = "2.0";
                         response["id"] = doc["id"];
-                        response["result"]["serverName"] = "ESP32-MCP-Server";
-                        response["result"]["serverVersion"] = "1.0.0";
+
+                        // 固定返回新协议格式
+                        response["result"]["protocolVersion"] = "2025-03-26";
+                        JsonObject tools = response["result"]["capabilities"].createNestedObject("tools");
+                        JsonObject tool1 = tools.createNestedObject("bedroom_light_on");
+                        tool1["description"] = "打开卧室灯";
+                        JsonObject tool2 = tools.createNestedObject("bedroom_light_off");
+                        tool2["description"] = "关闭卧室灯";
+                        JsonObject serverInfo = response["result"].createNestedObject("serverInfo");
+                        serverInfo["name"] = "ESP32-MCP-Server";
+                        serverInfo["version"] = "1.0.0";
+
                         String responseStr;
                         serializeJson(response, responseStr);
                         client->text(responseStr);
@@ -231,6 +241,11 @@ void NetworkManager::onWebSocketEvent(AsyncWebSocket* server,
                         serializeJson(response, responseStr);
                         client->text(responseStr);
                     }
+                    // 处理notifications/initialized通知
+                    else if (method == "notifications/initialized") {
+                        Serial.println("收到 notifications/initialized 通知");
+                        // 不需要回复
+                    }
                     // 处理tools/list请求
                     else if (method == "tools/list") {
                         DynamicJsonDocument response(1024);
@@ -238,17 +253,25 @@ void NetworkManager::onWebSocketEvent(AsyncWebSocket* server,
                         response["id"] = doc["id"];
                         JsonObject result = response.createNestedObject("result");
                         JsonArray tools = result.createNestedArray("tools");
-                        JsonObject tool = tools.createNestedObject();
-                        tool["name"] = "led_control";
-                        tool["description"] = "控制ESP32板载LED的开关";
-                        JsonObject inputSchema = tool.createNestedObject("inputSchema");
-                        inputSchema["type"] = "object";
-                        JsonObject props = inputSchema.createNestedObject("properties");
-                        JsonObject onProp = props.createNestedObject("on");
-                        onProp["type"] = "boolean";
-                        onProp["description"] = "true为打开LED，false为关闭LED";
-                        JsonArray required = inputSchema.createNestedArray("required");
-                        required.add("on");
+
+                        // bedroom_light_on
+                        JsonObject tool1 = tools.createNestedObject();
+                        tool1["name"] = "bedroom_light_on";
+                        tool1["description"] = "打开卧室灯";
+                        JsonObject schema1 = tool1.createNestedObject("inputSchema");
+                        schema1["type"] = "object";
+                        schema1.createNestedObject("properties");
+                        schema1.createNestedArray("required");
+
+                        // bedroom_light_off
+                        JsonObject tool2 = tools.createNestedObject();
+                        tool2["name"] = "bedroom_light_off";
+                        tool2["description"] = "关闭卧室灯";
+                        JsonObject schema2 = tool2.createNestedObject("inputSchema");
+                        schema2["type"] = "object";
+                        schema2.createNestedObject("properties");
+                        schema2.createNestedArray("required");
+
                         String responseStr;
                         serializeJson(response, responseStr);
                         client->text(responseStr);
@@ -256,37 +279,28 @@ void NetworkManager::onWebSocketEvent(AsyncWebSocket* server,
                     // 处理tools/call请求
                     else if (method == "tools/call") {
                         String toolName = doc["params"]["name"].as<String>();
-                        if (toolName == "led_control") {
-                            if (!doc["params"]["arguments"].containsKey("on")) {
-                                DynamicJsonDocument errorResp(256);
-                                errorResp["jsonrpc"] = "2.0";
-                                errorResp["id"] = doc["id"];
-                                JsonObject result = errorResp.createNestedObject("result");
-                                JsonArray contentArr = result.createNestedArray("content");
-                                JsonObject contentObj = contentArr.createNestedObject();
-                                contentObj["type"] = "text";
-                                contentObj["text"] = "参数错误，缺少on字段";
-                                result["isError"] = true;
-                                String errorStr;
-                                serializeJson(errorResp, errorStr);
-                                client->text(errorStr);
-                                return;
-                            }
-                            bool on = doc["params"]["arguments"]["on"].as<bool>();
-                            digitalWrite(2, on ? HIGH : LOW); // GPIO2
-                            DynamicJsonDocument resp(256);
-                            resp["jsonrpc"] = "2.0";
-                            resp["id"] = doc["id"];
-                            JsonObject result = resp.createNestedObject("result");
-                            JsonArray contentArr = result.createNestedArray("content");
-                            JsonObject contentObj = contentArr.createNestedObject();
-                            contentObj["type"] = "text";
-                            contentObj["text"] = on ? "LED已打开" : "LED已关闭";
-                            result["isError"] = false;
-                            String respStr;
-                            serializeJson(resp, respStr);
-                            client->text(respStr);
+                        DynamicJsonDocument resp(256);
+                        resp["jsonrpc"] = "2.0";
+                        resp["id"] = doc["id"];
+                        JsonObject result = resp.createNestedObject("result");
+                        JsonArray contentArr = result.createNestedArray("content");
+                        JsonObject contentObj = contentArr.createNestedObject();
+                        contentObj["type"] = "text";
+
+                        if (toolName == "bedroom_light_on") {
+                            digitalWrite(2, HIGH);
+                            contentObj["text"] = "true";
+                        } else if (toolName == "bedroom_light_off") {
+                            digitalWrite(2, LOW);
+                            contentObj["text"] = "true";
+                        } else {
+                            contentObj["text"] = "false";
+                            result["isError"] = true;
                         }
+                        result["isError"] = false;
+                        String respStr;
+                        serializeJson(resp, respStr);
+                        client->text(respStr);
                     }
                 }
             }
